@@ -569,9 +569,7 @@ with st.sidebar:
     st.markdown("""
     <div style='font-family:"Share Tech Mono";font-size:0.65rem;color:#4a6580;
                 line-height:1.8;'>
-    v2.0.0 — DEPLOYMENT BUILD<br>
-    Imperial College London<br>
-    National Heart & Lung Institute
+    v2.0.0 — DEPLOYMENT BUILD
     </div>
     """, unsafe_allow_html=True)
 
