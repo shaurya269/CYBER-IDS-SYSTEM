@@ -1,0 +1,15 @@
+# Dataset (CICIDS2017) - not redistributed, see README for download link
+MachineLearningCVE/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.claude/

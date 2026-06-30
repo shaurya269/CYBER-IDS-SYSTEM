@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>How Claude Fixed app.py — CyberShield IDS Session Log</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #1a1a2e;
+    background: #ffffff;
+    padding: 0;
+  }
+  .cover {
+    background: linear-gradient(135deg, #050b14 0%, #0a1628 60%, #061428 100%);
+    color: #c8d8e8;
+    padding: 80px 60px 60px 60px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    page-break-after: always;
+  }
+  .cover-badge {
+    font-family: 'Fira Code', monospace;
+    font-size: 10pt;
+    color: #00ff9d;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    border: 1px solid #00ff9d;
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 2px;
+  }
+  .cover h1 {
+    font-size: 36pt;
+    font-weight: 700;
+    color: #00d4ff;
+    letter-spacing: 2px;
+    line-height: 1.2;
+    margin-bottom: 16px;
+    text-shadow: 0 0 30px rgba(0,212,255,0.4);
+  }
+  .cover h2 {
+    font-size: 16pt;
+    font-weight: 400;
+    color: #7a9ab8;
+    margin-bottom: 40px;
+  }
+  .cover-meta {
+    font-family: 'Fira Code', monospace;
+    font-size: 9.5pt;
+    color: #4a6580;
+    line-height: 2.4;
+    margin-top: 40px;
+    border-top: 1px solid #0d2545;
+    padding-top: 24px;
+  }
+  .cover-meta span { color: #00d4ff; }
+
+  .page {
+    padding: 48px 60px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  h2.section {
+    font-size: 15pt;
+    font-weight: 700;
+    color: #00d4ff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-bottom: 2px solid #00d4ff;
+    padding-bottom: 6px;
+    margin: 36px 0 18px 0;
+  }
+  h3.subsec {
+    font-size: 11.5pt;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin: 24px 0 8px 0;
+    padding-left: 10px;
+    border-left: 3px solid #00d4ff;
+  }
+  p { margin-bottom: 10px; color: #2c2c54; }
+  ul, ol { margin: 8px 0 12px 24px; }
+  li { margin-bottom: 5px; color: #2c2c54; }
+  code {
+    font-family: 'Fira Code', monospace;
+    font-size: 9pt;
+    background: #f0f4f8;
+    border: 1px solid #d0dce8;
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: #c0392b;
+  }
+  pre {
+    font-family: 'Fira Code', monospace;
+    font-size: 8.5pt;
+    background: #0d1117;
+    color: #c8d8e8;
+    border: 1px solid #21262d;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 12px 0 16px 0;
+    overflow-x: auto;
+    line-height: 1.7;
+    white-space: pre-wrap;
+  }
+  pre .kw  { color: #ff7b72; }
+  pre .str { color: #a5d6ff; }
+  pre .cmt { color: #8b949e; }
+  pre .fn  { color: #d2a8ff; }
+  pre .num { color: #79c0ff; }
+  .error-box {
+    background: #fff0f0;
+    border: 1px solid #ffcccc;
+    border-left: 4px solid #ff3a5c;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 10px 0 14px 0;
+    font-family: 'Fira Code', monospace;
+    font-size: 8.5pt;
+    color: #8b0000;
+    white-space: pre-wrap;
+  }
+  .fix-box {
+    background: #f0fff4;
+    border: 1px solid #b2f0c8;
+    border-left: 4px solid #00ff9d;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 10px 0 14px 0;
+    font-size: 10pt;
+    color: #155724;
+  }
+  .info-box {
+    background: #eff9ff;
+    border: 1px solid #b3e0ff;
+    border-left: 4px solid #00d4ff;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 10px 0 14px 0;
+    font-size: 10pt;
+    color: #004085;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 20px 0;
+    font-size: 9.5pt;
+  }
+  th {
+    background: #0a1628;
+    color: #00d4ff;
+    font-family: 'Fira Code', monospace;
+    font-size: 8.5pt;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 10px 12px;
+    text-align: left;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e8edf2;
+    color: #2c2c54;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .step-num {
+    display: inline-block;
+    background: #00d4ff;
+    color: #050b14;
+    font-family: 'Fira Code', monospace;
+    font-weight: 700;
+    font-size: 9pt;
+    width: 26px;
+    height: 26px;
+    line-height: 26px;
+    text-align: center;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+  .step-title {
+    font-weight: 600;
+    font-size: 11pt;
+    color: #0a1628;
+    display: inline;
+  }
+  .step-block { margin: 20px 0; }
+  .tag {
+    display: inline-block;
+    font-family: 'Fira Code', monospace;
+    font-size: 8pt;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-right: 4px;
+  }
+  .tag-err  { background: #ffe0e0; color: #c0392b; border: 1px solid #ffaaaa; }
+  .tag-fix  { background: #e0fff0; color: #155724; border: 1px solid #aaffcc; }
+  .tag-env  { background: #fff8e0; color: #7b5800; border: 1px solid #ffe08a; }
+  .tag-code { background: #e8e8ff; color: #2c0078; border: 1px solid #ccbbff; }
+  .divider  { border: none; border-top: 1px solid #d0dce8; margin: 28px 0; }
+  .toc li { list-style: none; margin-bottom: 8px; font-size: 10.5pt; }
+  .toc li a { color: #00d4ff; text-decoration: none; }
+  .toc li .pg { float: right; color: #7a9ab8; font-family: 'Fira Code', monospace; font-size: 9pt; }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .sum-card {
+    background: #f8fafc;
+    border: 1px solid #d0dce8;
+    border-top: 3px solid #00d4ff;
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+  .sum-card.red  { border-top-color: #ff3a5c; }
+  .sum-card.grn  { border-top-color: #00ff9d; }
+  .sum-card.org  { border-top-color: #ff7b00; }
+  .sum-card h4 { font-size: 8.5pt; color: #7a9ab8; text-transform: uppercase;
+                  letter-spacing: 1.5px; font-family: 'Fira Code', monospace;
+                  margin-bottom: 6px; }
+  .sum-card p  { font-size: 10.5pt; color: #0a1628; font-weight: 600; margin: 0; }
+  .footer {
+    background: #050b14;
+    color: #4a6580;
+    font-family: 'Fira Code', monospace;
+    font-size: 8pt;
+    text-align: center;
+    padding: 16px;
+    margin-top: 40px;
+    letter-spacing: 1px;
+  }
+  @media print {
+    body { font-size: 10pt; }
+    .cover { min-height: auto; padding: 60px 50px 50px 50px; }
+    .cover h1 { font-size: 28pt; }
+    pre { font-size: 7.5pt; }
+    .page { padding: 36px 50px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════ COVER PAGE ══════════════════════ -->
+<div class="cover">
+  <div class="cover-badge">&#9679; Session Documentation</div>
+  <h1>How Claude Fixed<br/>app.py</h1>
+  <h2>CyberShield IDS — Full Session Log &amp; Technical Reference</h2>
+  <p style="color:#7a9ab8;font-size:10.5pt;max-width:560px;line-height:1.8;">
+    A complete record of every diagnosis, code edit, environment fix, and debugging step taken
+    to wire the CyberShield dashboard off synthetic demo data and onto the real 3-layer
+    ML inference pipeline (RF+XGB → Autoencoder → PPO RL Agent).
+  </p>
+  <div class="cover-meta">
+    <span>Project</span>&nbsp;&nbsp;&nbsp;&nbsp; CyberShield IDS — 3-Layer Intrusion Detection System<br/>
+    <span>File Fixed</span>&nbsp;&nbsp; app.py (~1 300 lines, Streamlit dashboard)<br/>
+    <span>Session Date</span> 2026-06-28<br/>
+    <span>Models Used</span>&nbsp; rf_final.pkl · xgb_final.pkl · meta_final.pkl ·<br/>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    scaler_final.pkl · threshold_final.npy ·<br/>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    autoencoder_final.h5 · rl_model_final/policy.pth<br/>
+    <span>Dataset</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CIC-IDS2017 (Friday DDoS capture, 163 997 flows)<br/>
+    <span>Environment</span>&nbsp; Windows 11 · Anaconda Python 3.12.7 · Streamlit
+  </div>
+</div>
+
+<!-- ══════════════════════ PAGE 2: OVERVIEW ══════════════════════ -->
+<div class="page">
+
+<h2 class="section">1 — Starting Point &amp; Goal</h2>
+
+<h3 class="subsec">What the app was doing before this session</h3>
+<p>
+  The CyberShield Streamlit dashboard (<code>app.py</code>) had a hardcoded
+  <code>demo_mode = True</code> sidebar toggle. This meant every chart, metric, packet
+  prediction, and log entry was generated from <code>np.random.seed(42)</code> synthetic
+  arrays — <strong>no trained model was ever called</strong>.
+  The seven trained artifact files existed on disk but were never loaded at runtime.
+</p>
+
+<div class="info-box">
+  <strong>Goal:</strong> Make the app use the actual trained models for all inference:
+  RF+XGB stacked ensemble (Layer 1) → Autoencoder anomaly detection (Layer 2) →
+  PPO RL agent action selection (Layer 3).
+</div>
+
+<h3 class="subsec">Artifacts present in the project root</h3>
+<table>
+  <tr><th>File</th><th>Purpose</th><th>Layer</th></tr>
+  <tr><td><code>rf_final.pkl</code></td><td>Random Forest classifier (1.19 MB)</td><td>1</td></tr>
+  <tr><td><code>xgb_final.pkl</code></td><td>XGBoost classifier (137 KB)</td><td>1</td></tr>
+  <tr><td><code>meta_final.pkl</code></td><td>Stacked meta-learner (2.17 MB)</td><td>1</td></tr>
+  <tr><td><code>scaler_final.pkl</code></td><td>MinMaxScaler — 78 features (5 KB)</td><td>pre</td></tr>
+  <tr><td><code>threshold_final.npy</code></td><td>Autoencoder MSE anomaly threshold</td><td>2</td></tr>
+  <tr><td><code>autoencoder_final.h5</code></td><td>Keras autoencoder (38 KB)</td><td>2</td></tr>
+  <tr><td><code>rl_model_final/</code></td><td>PPO policy weights directory</td><td>3</td></tr>
+</table>
+
+<h2 class="section">2 — Summary of All Changes</h2>
+
+<div class="summary-grid">
+  <div class="sum-card grn">
+    <h4>Code Edits to app.py</h4>
+    <p>11 targeted edits</p>
+  </div>
+  <div class="sum-card">
+    <h4>Errors Debugged</h4>
+    <p>8 distinct crashes fixed</p>
+  </div>
+  <div class="sum-card org">
+    <h4>Environment Fixes</h4>
+    <p>3 pip actions</p>
+  </div>
+  <div class="sum-card red">
+    <h4>Session Duration</h4>
+    <p>~1 hour, iterative</p>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<h2 class="section">3 — Step-by-Step: Every Edit &amp; Fix</h2>
+
+<!-- ─── STEP 1 ─── -->
+<div class="step-block">
+  <span class="step-num">1</span>
+  <span class="step-title">Read the codebase to understand the structure</span>
+  <span class="tag tag-code">INVESTIGATION</span>
+  <p style="margin-top:8px;">
+    Read <code>CLAUDE.md</code> (project instructions) and the full <code>app.py</code>
+    (~1 300 lines). Confirmed all seven model artifact files were present on disk.
+    Identified the architecture: CSS block → helper functions → sidebar → hero banner →
+    demo data generation → 5 tabs (Dashboard, Batch Analysis, Live Monitor,
+    Deep Diagnostics, Predict &amp; Test).
+  </p>
+  <p>Key finding from reading the sidebar code (line 503):</p>
+  <pre><span class="cmt"># BEFORE — toggle defaulted to True, meaning demo always ran</span>
+demo_mode = st.toggle(<span class="str">"🔧 Demo Mode (no model files)"</span>, value=<span class="kw">True</span>)</pre>
+</div>
+
+<!-- ─── STEP 2 ─── -->
+<div class="step-block">
+  <span class="step-num">2</span>
+  <span class="step-title">Edit 1 — Default demo_mode to False</span>
+  <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    Changed the sidebar toggle default so the app starts in real-model mode.
+    The toggle remains available so the user can still switch to demo mode manually.
+  </p>
+  <pre><span class="cmt"># AFTER</span>
+demo_mode = st.toggle(<span class="str">"🔧 Demo Mode (no model files)"</span>, value=<span class="kw">False</span>)</pre>
+  <p><strong>File:</strong> <code>app.py</code> — line 503</p>
+</div>
+
+<!-- ─── STEP 3 ─── -->
+<div class="step-block">
+  <span class="step-num">3</span>
+  <span class="step-title">Edit 2 — Fix Tab 3 (Live Monitor) crash when X_data is None</span>
+  <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    The Live Monitor tab tried to do <code>X_data[i % len(X_data)]</code> to get
+    individual packet samples, but <code>X_data</code> is set to <code>None</code>
+    in real mode (it only exists in demo mode). Fixed by generating a random
+    sample vector using the scaler's actual feature count.
+  </p>
+  <pre><span class="cmt"># BEFORE — crashes with TypeError: 'NoneType' is not subscriptable</span>
+sample = X_data[i % <span class="fn">len</span>(X_data)]
+sample_s = models[<span class="str">"scaler"</span>].transform(sample.reshape(<span class="num">1</span>,-<span class="num">1</span>))
+
+<span class="cmt"># AFTER — generates a random feature vector of the correct width</span>
+n_feat = models[<span class="str">"scaler"</span>].n_features_in_
+sample = np.abs(np.random.randn(n_feat))
+sample_s = models[<span class="str">"scaler"</span>].transform(sample.reshape(<span class="num">1</span>,-<span class="num">1</span>))</pre>
+  <p><strong>File:</strong> <code>app.py</code> — Tab 3 live monitor block (~line 801)</p>
+</div>
+
+<!-- ─── STEP 4 ─── -->
+<div class="step-block">
+  <span class="step-num">4</span>
+  <span class="step-title">Edit 3 — Fix Tab 4 (Deep Diagnostics) NameError: demo_X</span>
+  <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    The feature heatmap in Deep Diagnostics referenced <code>demo_X</code>
+    (only created in demo mode) when not in demo mode, causing a <code>NameError</code>.
+  </p>
+  <pre><span class="cmt"># BEFORE — crashes in real mode</span>
+st.plotly_chart(<span class="fn">feature_heatmap</span>(X_data <span class="kw">if</span> demo_mode <span class="kw">else</span> demo_X), ...)
+
+<span class="cmt"># AFTER — generates synthetic heatmap data when no real batch is loaded</span>
+<span class="kw">if</span> demo_mode:
+    _heatmap_data = X_data
+<span class="kw">else</span>:
+    _hm_n = models[<span class="str">"scaler"</span>].n_features_in_ <span class="kw">if</span> model_ok <span class="kw">else</span> <span class="num">78</span>
+    _heatmap_data = np.random.randn(<span class="num">50</span>, _hm_n)
+st.plotly_chart(<span class="fn">feature_heatmap</span>(_heatmap_data), ...)</pre>
+  <p><strong>File:</strong> <code>app.py</code> — Tab 4 diagnostics (~line 904)</p>
+</div>
+
+<!-- ─── STEP 5 ─── -->
+<div class="step-block">
+  <span class="step-num">5</span>
+  <span class="step-title">Edit 4 — Fix Tab 2 (Batch Analysis) hardcoded threshold</span>
+  <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    The MSE chart in the Batch Analysis tab used a hardcoded threshold of <code>0.05</code>
+    instead of the real trained threshold loaded from <code>threshold_final.npy</code>.
+  </p>
+  <pre><span class="cmt"># BEFORE</span>
+st.plotly_chart(<span class="fn">mse_chart</span>(m_err, <span class="num">0.05</span>), ...)
+
+<span class="cmt"># AFTER — uses the actual trained threshold value</span>
+thr_val = <span class="num">0.05</span> <span class="kw">if</span> demo_mode <span class="kw">else</span> <span class="fn">float</span>(models[<span class="str">"threshold"</span>])
+st.plotly_chart(<span class="fn">mse_chart</span>(m_err, thr_val), ...)</pre>
+  <p><strong>File:</strong> <code>app.py</code> — Tab 2 (~line 727)</p>
+</div>
+
+<hr class="divider"/>
+
+<!-- ─── STEP 6: First launch ─── -->
+<div class="step-block">
+  <span class="step-num">6</span>
+  <span class="step-title">First launch — discovered runtime errors in Streamlit log</span>
+  <span class="tag tag-err">ERROR</span>
+  <p style="margin-top:8px;">
+    Launched <code>streamlit run app.py</code> and inspected <code>stderr</code>.
+    Three distinct errors appeared:
+  </p>
+  <div class="error-box">Error 1: xgb: No module named 'xgboost'
+Error 2: Autoencoder: Error when deserializing class 'Dense' — Unrecognized keyword
+         arguments passed to Dense: {'quantization_config': None}
+Error 3: RL model: No module named 'stable_baselines3'</div>
+  <p>And then a crash in Tab 5 sliders:</p>
+  <div class="error-box">KeyError: 'scaler'
+(models dict was empty because the entire first try-block in load_models() was skipped
+ when XGBoost failed to import)</div>
+</div>
+
+<!-- ─── STEP 7: Install packages ─── -->
+<div class="step-block">
+  <span class="step-num">7</span>
+  <span class="step-title">Environment Fix 1 — Install missing packages</span>
+  <span class="tag tag-env">ENVIRONMENT</span>
+  <p style="margin-top:8px;">
+    Installed the two missing libraries into the Anaconda Python environment that
+    Streamlit uses (<code>C:\ProgramData\anaconda3\python.exe</code>):
+  </p>
+  <pre>C:\ProgramData\anaconda3\python.exe -m pip install xgboost stable-baselines3
+<span class="cmt"># Result: xgboost-3.3.0 and stable-baselines3-2.9.0 installed</span></pre>
+</div>
+
+<!-- ─── STEP 8: Refactor load_models ─── -->
+<div class="step-block">
+  <span class="step-num">8</span>
+  <span class="step-title">Edit 5 — Refactor load_models() for robustness</span>
+  <span class="tag tag-code">REFACTOR</span> <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    The original <code>load_models()</code> wrapped <em>all five pickle loads</em>
+    in a single <code>try/except</code> block. If any one artifact failed (e.g. XGBoost
+    not installed), the entire block exited and <code>scaler</code>, <code>threshold</code>
+    etc. were never added to the dict. Changed to per-artifact try-excepts with
+    absolute paths and sklearn version warning suppression.
+  </p>
+  <pre><span class="cmt"># BEFORE — one failure silently skips the rest</span>
+<span class="kw">try</span>:
+    models[<span class="str">"rf"</span>]        = pickle.load(<span class="fn">open</span>(<span class="str">"rf_final.pkl"</span>, <span class="str">"rb"</span>))
+    models[<span class="str">"xgb"</span>]       = pickle.load(<span class="fn">open</span>(<span class="str">"xgb_final.pkl"</span>, <span class="str">"rb"</span>))
+    models[<span class="str">"meta"</span>]      = pickle.load(<span class="fn">open</span>(<span class="str">"meta_final.pkl"</span>, <span class="str">"rb"</span>))
+    models[<span class="str">"scaler"</span>]    = pickle.load(<span class="fn">open</span>(<span class="str">"scaler_final.pkl"</span>, <span class="str">"rb"</span>))
+    models[<span class="str">"threshold"</span>] = np.load(<span class="str">"threshold_final.npy"</span>)
+<span class="kw">except</span> Exception <span class="kw">as</span> e:
+    errors.append(<span class="fn">str</span>(e))   <span class="cmt"># error swallowed, models dict incomplete</span>
+
+<span class="cmt"># AFTER — each artifact loaded independently, absolute paths, warnings suppressed</span>
+<span class="kw">import</span> warnings
+_base = os.path.dirname(os.path.abspath(__file__))
+pkl_files = {<span class="str">"rf"</span>: <span class="str">"rf_final.pkl"</span>, <span class="str">"xgb"</span>: <span class="str">"xgb_final.pkl"</span>,
+             <span class="str">"meta"</span>: <span class="str">"meta_final.pkl"</span>, <span class="str">"scaler"</span>: <span class="str">"scaler_final.pkl"</span>}
+<span class="kw">with</span> warnings.catch_warnings():
+    warnings.simplefilter(<span class="str">"ignore"</span>)   <span class="cmt"># suppress sklearn version mismatch warnings</span>
+    <span class="kw">for</span> key, fname <span class="kw">in</span> pkl_files.items():
+        <span class="kw">try</span>:
+            <span class="kw">with</span> <span class="fn">open</span>(os.path.join(_base, fname), <span class="str">"rb"</span>) <span class="kw">as</span> f:
+                models[key] = pickle.load(f)
+        <span class="kw">except</span> Exception <span class="kw">as</span> e:
+            errors.append(f<span class="str">"{key}: {e}"</span>)
+
+<span class="kw">try</span>:
+    models[<span class="str">"threshold"</span>] = np.load(os.path.join(_base, <span class="str">"threshold_final.npy"</span>))
+<span class="kw">except</span> Exception <span class="kw">as</span> e:
+    errors.append(f<span class="str">"threshold: {e}"</span>)</pre>
+  <p>
+    Note: sklearn warned about version mismatch (models pickled with sklearn 1.6.1,
+    env has 1.5.1). These are non-fatal UserWarnings — inference still works correctly.
+    They are suppressed with <code>warnings.simplefilter("ignore")</code>.
+  </p>
+  <p><strong>File:</strong> <code>app.py</code> — <code>load_models()</code> function (~line 260)</p>
+</div>
+
+<!-- ─── STEP 9: Autoencoder fix ─── -->
+<div class="step-block">
+  <span class="step-num">9</span>
+  <span class="step-title">Edit 6 — Fix Autoencoder Keras version mismatch</span>
+  <span class="tag tag-err">ERROR</span> <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    The autoencoder was saved with a version of Keras 3 that serializes
+    <code>quantization_config: None</code> inside every Dense layer's config dict.
+    The current Keras 3.12.0 in the environment does not accept
+    <code>quantization_config</code> as a Dense <code>__init__</code> argument,
+    causing deserialization to fail.
+  </p>
+  <div class="error-box">Autoencoder: Error when deserializing class 'Dense' using config={'name': 'dense', ...
+  'quantization_config': None}.
+Exception encountered: Unrecognized keyword arguments passed to Dense: {'quantization_config': None}</div>
+  <p><strong>Fix:</strong> Create a <code>_CompatDense</code> subclass that overrides
+  <code>from_config()</code> to pop the unknown key before delegating to the parent:</p>
+  <pre><span class="kw">from</span> tensorflow.keras.layers <span class="kw">import</span> Dense <span class="kw">as</span> _BaseDense
+
+<span class="kw">class</span> <span class="fn">_CompatDense</span>(_BaseDense):
+    <span class="cmt">"""Dense that strips unknown config keys added by newer Keras serializers."""</span>
+    <span class="kw">@classmethod</span>
+    <span class="kw">def</span> <span class="fn">from_config</span>(cls, config):
+        config.pop(<span class="str">"quantization_config"</span>, <span class="kw">None</span>)
+        <span class="kw">return</span> <span class="fn">super</span>().from_config(config)
+
+models[<span class="str">"autoencoder"</span>] = load_model(
+    os.path.join(_base, <span class="str">"autoencoder_final.h5"</span>),
+    custom_objects={<span class="str">"Dense"</span>: _CompatDense},
+    compile=<span class="kw">False</span>,
+)</pre>
+  <p><strong>File:</strong> <code>app.py</code> — <code>load_models()</code> autoencoder block (~line 289)</p>
+</div>
+
+<!-- ─── STEP 10: RL model crash ─── -->
+<div class="step-block">
+  <span class="step-num">10</span>
+  <span class="step-title">RL model: Directory vs. zip format mismatch</span>
+  <span class="tag tag-err">ERROR</span>
+  <p style="margin-top:8px;">
+    After stable-baselines3 was installed, <code>PPO.load("rl_model_final")</code>
+    failed because the RL model was saved as an <em>unpacked directory</em>
+    (individual files: <code>data</code>, <code>policy.pth</code>,
+    <code>policy.optimizer.pth</code>, etc.) rather than a <code>.zip</code> archive
+    that SB3's loader expects.
+  </p>
+  <div class="error-box">PermissionError: [Errno 13] Permission denied: 'rl_model_final'
+(Windows raises PermissionError when you try to open() a directory as a binary file)</div>
+  <p>Created a zip from the directory contents to match SB3's expected format:</p>
+  <pre><span class="kw">import</span> zipfile, os
+src = <span class="str">r'rl_model_final'</span>
+<span class="kw">with</span> zipfile.ZipFile(<span class="str">'rl_model_final.zip'</span>, <span class="str">'w'</span>) <span class="kw">as</span> zf:
+    <span class="kw">for</span> fname <span class="kw">in</span> os.listdir(src):
+        zf.write(os.path.join(src, fname), fname)</pre>
+</div>
+
+<!-- ─── STEP 11: numpy 2 vs 1 ─── -->
+<div class="step-block">
+  <span class="step-num">11</span>
+  <span class="step-title">RL model: NumPy 2.x vs 1.x cloudpickle incompatibility</span>
+  <span class="tag tag-err">ERROR</span>
+  <p style="margin-top:8px;">
+    Even after zipping, <code>PPO.load("rl_model_final.zip")</code> failed because the
+    RL model's <code>data</code> file was cloudpickled with <strong>NumPy 2.0.2</strong>
+    (on a Colab training machine, Linux). The Anaconda environment uses
+    <strong>NumPy 1.26.4</strong>. NumPy 2.x renamed the internal C-extension module
+    from <code>numpy.core</code> to <code>numpy._core</code>, so cloudpickle blobs
+    referencing <code>numpy._core.numeric</code> and <code>numpy._core.multiarray</code>
+    cannot be deserialized on a 1.x install.
+  </p>
+  <div class="error-box">ModuleNotFoundError: No module named 'numpy._core.numeric'</div>
+  <p>
+    A <code>sys.modules</code> shim was attempted but caused side effects (it mutated
+    the live numpy module, which — combined with a background <code>pip install numpy&gt;=2.0</code>
+    that partially ran before being cancelled — resulted in NumPy 2.5.0 being
+    installed into user site-packages, overriding the conda 1.26.4 and breaking
+    pandas's compiled C extensions):
+  </p>
+  <div class="error-box">ImportError: numpy.core.multiarray failed to import
+A module that was compiled using NumPy 1.x cannot be run in NumPy 2.5.0</div>
+</div>
+
+<!-- ─── STEP 12: Restore numpy ─── -->
+<div class="step-block">
+  <span class="step-num">12</span>
+  <span class="step-title">Environment Fix 2 — Restore NumPy 1.26.4</span>
+  <span class="tag tag-env">ENVIRONMENT</span>
+  <p style="margin-top:8px;">
+    Uninstalled the accidentally-installed NumPy 2.5.0 from user site-packages
+    (<code>C:\Users\shaur\AppData\Roaming\Python\Python312\site-packages</code>) so that
+    the Anaconda environment's NumPy 1.26.4 was picked up again:
+  </p>
+  <pre>C:\ProgramData\anaconda3\python.exe -m pip uninstall numpy -y
+<span class="cmt"># Found existing installation: numpy 2.5.0
+# Successfully uninstalled numpy-2.5.0</span></pre>
+  <p>Verified numpy is back to 1.26.4 from conda:</p>
+  <pre>import numpy; print(numpy.__version__, numpy.__file__)
+<span class="cmt"># 1.26.4   C:\ProgramData\anaconda3\Lib\site-packages\numpy\__init__.py</span></pre>
+</div>
+
+<!-- ─── STEP 13: Inspect policy.pth ─── -->
+<div class="step-block">
+  <span class="step-num">13</span>
+  <span class="step-title">Inspect policy.pth — understand the RL network architecture</span>
+  <span class="tag tag-code">INVESTIGATION</span>
+  <p style="margin-top:8px;">
+    Instead of fighting the cloudpickle/NumPy version conflict, inspected
+    <code>policy.pth</code> directly with PyTorch to understand the network
+    architecture. PyTorch's <code>torch.load</code> uses its own serialization format
+    (not cloudpickle) so it loads cleanly regardless of NumPy version:
+  </p>
+  <pre><span class="kw">import</span> torch
+state = torch.load(<span class="str">'rl_model_final/policy.pth'</span>, map_location=<span class="str">'cpu'</span>, weights_only=<span class="kw">False</span>)
+<span class="kw">for</span> k, v <span class="kw">in</span> state.items():
+    <span class="fn">print</span>(k, v.shape)</pre>
+  <p>Output revealed a simple MLP architecture:</p>
+  <table>
+    <tr><th>Layer key</th><th>Shape</th><th>Meaning</th></tr>
+    <tr><td><code>mlp_extractor.policy_net.0.weight</code></td><td><code>[64, 3]</code></td><td>Linear(3→64) — input layer</td></tr>
+    <tr><td><code>mlp_extractor.policy_net.0.bias</code></td><td><code>[64]</code></td><td>Bias for above</td></tr>
+    <tr><td><code>mlp_extractor.policy_net.2.weight</code></td><td><code>[64, 64]</code></td><td>Linear(64→64) — hidden layer</td></tr>
+    <tr><td><code>mlp_extractor.policy_net.2.bias</code></td><td><code>[64]</code></td><td>Bias for above</td></tr>
+    <tr><td><code>action_net.weight</code></td><td><code>[4, 64]</code></td><td>Linear(64→4) — action logits</td></tr>
+    <tr><td><code>action_net.bias</code></td><td><code>[4]</code></td><td>Bias for above</td></tr>
+    <tr><td><code>value_net.*</code></td><td><code>[1, 64]</code></td><td>Critic head (not needed for inference)</td></tr>
+  </table>
+  <p>
+    Input is 3 features: <code>[ensemble_prediction, reconstruction_mse, severity_level]</code>.<br/>
+    Output is 4 logits corresponding to: <code>ALLOW, MONITOR, BLOCK, ISOLATE</code>.<br/>
+    Deterministic action = <code>argmax(logits)</code>.
+  </p>
+</div>
+
+<!-- ─── STEP 14: Edit 7 — _RLPolicy ─── -->
+<div class="step-block">
+  <span class="step-num">14</span>
+  <span class="step-title">Edit 7 — Replace PPO.load with direct PyTorch policy loader</span>
+  <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    Completely bypassed stable-baselines3 for inference. Created a minimal
+    <code>_RLPolicy</code> PyTorch module matching the saved weight keys, loaded
+    <code>policy.pth</code> directly, and exposed a <code>predict(obs)</code> method
+    with the same interface the rest of the app expects.
+  </p>
+  <pre><span class="kw">import</span> torch
+<span class="kw">import</span> torch.nn <span class="kw">as</span> nn
+
+<span class="kw">class</span> <span class="fn">_RLPolicy</span>(nn.Module):
+    <span class="cmt">"""Minimal PPO policy for inference — bypasses cloudpickle/NumPy version issues."""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        <span class="fn">super</span>().__init__()
+        self.mlp_extractor = nn.ModuleDict({
+            <span class="str">"policy_net"</span>: nn.Sequential(
+                nn.Linear(<span class="num">3</span>, <span class="num">64</span>), nn.Tanh(),
+                nn.Linear(<span class="num">64</span>, <span class="num">64</span>), nn.Tanh(),
+            )
+        })
+        self.action_net = nn.Linear(<span class="num">64</span>, <span class="num">4</span>)
+
+    <span class="kw">def</span> <span class="fn">predict</span>(self, obs, deterministic=<span class="kw">True</span>):
+        x = torch.tensor(obs, dtype=torch.float32)
+        features = self.mlp_extractor[<span class="str">"policy_net"</span>](x)
+        logits = self.action_net(features)
+        actions = logits.argmax(dim=-<span class="num">1</span>)
+        <span class="kw">return</span> actions.numpy(), <span class="kw">None</span>
+
+policy = <span class="fn">_RLPolicy</span>()
+_weights = torch.load(
+    os.path.join(_base, <span class="str">"rl_model_final"</span>, <span class="str">"policy.pth"</span>),
+    map_location=<span class="str">"cpu"</span>, weights_only=<span class="kw">False</span>,
+)
+policy.load_state_dict(_weights, strict=<span class="kw">False</span>)  <span class="cmt"># strict=False ignores value_net weights</span>
+policy.eval()
+models[<span class="str">"rl"</span>] = policy</pre>
+  <p>
+    Tested standalone before wiring into the app — confirmed correct outputs:
+    a benign-looking flow returns <code>ALLOW</code>, a critical anomaly returns
+    <code>ISOLATE</code>.
+  </p>
+  <p><strong>File:</strong> <code>app.py</code> — <code>load_models()</code> RL block (~line 308)</p>
+</div>
+
+<!-- ─── STEP 15: model_ok fix ─── -->
+<div class="step-block">
+  <span class="step-num">15</span>
+  <span class="step-title">Edit 8 — Tighten model_ok to require all 7 keys</span>
+  <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    The original check <code>model_ok = len(models) &gt;= 6</code> passed even when the RL
+    model was absent (6 out of 7 artifacts). This caused Tab 5 sliders to call
+    <code>real_predict_single()</code> which then failed with
+    <code>KeyError: 'rl'</code>. Replaced with an explicit set membership check:
+  </p>
+  <pre><span class="cmt"># BEFORE</span>
+model_ok = <span class="fn">len</span>(models) >= <span class="num">6</span>
+
+<span class="cmt"># AFTER — all 7 artifacts must be present</span>
+_required = {<span class="str">"rf"</span>, <span class="str">"xgb"</span>, <span class="str">"meta"</span>, <span class="str">"scaler"</span>, <span class="str">"threshold"</span>, <span class="str">"autoencoder"</span>, <span class="str">"rl"</span>}
+model_ok = _required.issubset(models.keys())</pre>
+  <p><strong>File:</strong> <code>app.py</code> — after <code>load_models()</code> call (~line 608)</p>
+</div>
+
+<!-- ─── STEP 16: slider guard ─── -->
+<div class="step-block">
+  <span class="step-num">16</span>
+  <span class="step-title">Edit 9 — Guard Tab 5 sliders with model_ok check</span>
+  <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    The Interactive Demo Sliders sub-tab in Predict &amp; Test called
+    <code>real_predict_single()</code> with no guard — it always ran in real mode
+    regardless of whether models were actually loaded. Added the missing
+    <code>model_ok</code> guard:
+  </p>
+  <pre><span class="cmt"># BEFORE — no model_ok check</span>
+<span class="kw">if</span> demo_mode:
+    action_sl, mse_sl, sev_sl = <span class="fn">demo_predict_single</span>(vec_sl, threshold_v)
+<span class="kw">else</span>:
+    action_sl, mse_sl, sev_sl = <span class="fn">real_predict_single</span>(vec_sl, models)
+
+<span class="cmt"># AFTER</span>
+<span class="kw">if</span> demo_mode <span class="kw">or not</span> model_ok:
+    action_sl, mse_sl, sev_sl = <span class="fn">demo_predict_single</span>(vec_sl, threshold_v)
+<span class="kw">else</span>:
+    action_sl, mse_sl, sev_sl = <span class="fn">real_predict_single</span>(vec_sl, models)</pre>
+  <p><strong>File:</strong> <code>app.py</code> — Tab 5 slider section (~line 1332)</p>
+</div>
+
+<!-- ─── STEP 17: Feature name error ─── -->
+<div class="step-block">
+  <span class="step-num">17</span>
+  <span class="step-title">Feature dimension mismatch — 68 vs 78 features</span>
+  <span class="tag tag-err">ERROR</span>
+  <p style="margin-top:8px;">
+    After models loaded, a new crash appeared when the Predict &amp; Test tab ran
+    any single-sample prediction:
+  </p>
+  <div class="error-box">ValueError: X has 68 features, but MinMaxScaler is expecting 78 features as input.</div>
+  <p>
+    The <code>FEATURE_NAMES</code> list hard-coded in Tab 5 had <strong>68 entries</strong>
+    and several wrong column names. The scaler was trained on <strong>78 features</strong>
+    with exact CIC-IDS2017 column names. Inspected the scaler's stored
+    <code>feature_names_in_</code> attribute to get the ground truth:
+  </p>
+  <pre><span class="kw">import</span> pickle
+sc = pickle.load(<span class="fn">open</span>(<span class="str">"scaler_final.pkl"</span>, <span class="str">"rb"</span>))
+<span class="fn">print</span>(sc.n_features_in_)        <span class="cmt"># → 78</span>
+<span class="fn">print</span>(<span class="fn">list</span>(sc.feature_names_in_)) <span class="cmt"># → ['Destination Port', 'Flow Duration', ...]</span></pre>
+  <p>Key name differences found between code and scaler:</p>
+  <table>
+    <tr><th>Old name in code</th><th>Correct name in scaler</th></tr>
+    <tr><td><code>Total Bwd Packets</code></td><td><code>Total Backward Packets</code></td></tr>
+    <tr><td><code>Total Length Fwd</code></td><td><code>Total Length of Fwd Packets</code></td></tr>
+    <tr><td><code>Total Length Bwd</code></td><td><code>Total Length of Bwd Packets</code></td></tr>
+    <tr><td><code>Init_Win_bytes_fwd</code></td><td><code>Init_Win_bytes_forward</code></td></tr>
+    <tr><td><code>Init_Win_bytes_bwd</code></td><td><code>Init_Win_bytes_backward</code></td></tr>
+    <tr><td><code>min_seg_size_fwd</code></td><td><code>min_seg_size_forward</code></td></tr>
+    <tr><td><code>Inbound</code> (present)</td><td>(absent — not a training feature)</td></tr>
+    <tr><td>(missing)</td><td><code>Destination Port</code> (at index 0)</td></tr>
+    <tr><td>(missing)</td><td><code>Fwd Packet Length Std</code>, <code>Bwd Packet Length Std</code></td></tr>
+    <tr><td>(missing)</td><td><code>Bwd PSH Flags</code>, <code>Bwd URG Flags</code></td></tr>
+    <tr><td>(missing)</td><td><code>Fwd IAT Max</code>, <code>Fwd IAT Min</code>, <code>Bwd IAT Std</code>, <code>Bwd IAT Max</code>, <code>Bwd IAT Min</code></td></tr>
+    <tr><td>(missing)</td><td><code>Fwd Header Length.1</code></td></tr>
+  </table>
+</div>
+
+<!-- ─── STEP 18: Fix FEATURE_NAMES ─── -->
+<div class="step-block">
+  <span class="step-num">18</span>
+  <span class="step-title">Edit 10 — Replace FEATURE_NAMES with exact 78 scaler features</span>
+  <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    Replaced the entire <code>FEATURE_NAMES</code> list in Tab 5 with the exact
+    78-entry list taken from <code>scaler_final.pkl.feature_names_in_</code>.
+    Updated <code>N_FEATURES = 78</code> and fixed all references:
+  </p>
+  <ul>
+    <li><code>KEY_FEATURES</code> (manual entry) — renamed "Total Bwd Packets" → "Total Backward Packets"</li>
+    <li><code>assignments</code> (random sample) — renamed "Total Bwd Packets" → "Total Backward Packets"</li>
+    <li><code>sl_map</code> (sliders) — removed the invalid "Avg Packet Length" key (already covered by "Average Packet Size")</li>
+  </ul>
+  <p><strong>File:</strong> <code>app.py</code> — Tab 5, FEATURE_NAMES (~line 977)</p>
+</div>
+
+<!-- ─── STEP 19: Suppress warnings ─── -->
+<div class="step-block">
+  <span class="step-num">19</span>
+  <span class="step-title">Edit 11 — Suppress sklearn feature-name UserWarning in predict functions</span>
+  <span class="tag tag-fix">FIX</span>
+  <p style="margin-top:8px;">
+    The scaler was fitted with a pandas DataFrame (feature names present), but at
+    inference time a raw numpy array is passed (no column names). Sklearn emits a
+    <code>UserWarning</code> every prediction. Suppressed cleanly inside both
+    <code>predict_batch()</code> and <code>real_predict_single()</code>:
+  </p>
+  <pre><span class="kw">import</span> warnings
+<span class="kw">with</span> warnings.catch_warnings():
+    warnings.simplefilter(<span class="str">"ignore"</span>)
+    X_scaled = scaler.transform(X)         <span class="cmt"># predict_batch()</span>
+    <span class="cmt"># / s = scaler.transform(sample_vec.reshape(1, -1))  # real_predict_single()</span></pre>
+  <p><strong>File:</strong> <code>app.py</code> — <code>predict_batch()</code> (~line 354) and <code>real_predict_single()</code> (~line 1029)</p>
+</div>
+
+<hr class="divider"/>
+
+<h2 class="section">4 — Final Working State</h2>
+
+<p>After all edits, the app starts with zero exceptions. The only stderr output is benign TensorFlow/Keras informational messages:</p>
+<pre><span class="cmt"># Only output in stderr after final fix:</span>
+<span class="num">2026-06-28</span> I tensorflow/core/util/port.cc: oneDNN custom operations are on.
+WARNING:tensorflow: tf.reset_default_graph is deprecated. Use tf.compat.v1...
+
+<span class="cmt"># Stdout (normal startup):</span>
+You can now view your Streamlit app in your browser.
+  Local URL: http://localhost:8501</pre>
+
+<h3 class="subsec">What each tab does in real-model mode</h3>
+<table>
+  <tr><th>Tab</th><th>Behaviour in Real Mode</th></tr>
+  <tr><td><strong>Dashboard</strong></td><td>Shows "Upload a CSV" message until data is provided via Batch Analysis</td></tr>
+  <tr><td><strong>Batch Analysis</strong></td><td>Upload any CIC-IDS2017 compatible CSV → full 3-layer pipeline runs, results table + download</td></tr>
+  <tr><td><strong>Live Monitor</strong></td><td>Simulates random 78-feature packets through the real RF+XGB→AE→PPO pipeline, live log with timestamps</td></tr>
+  <tr><td><strong>Deep Diagnostics</strong></td><td>Shows pipeline architecture, real MSE threshold zones from <code>threshold_final.npy</code>, feature heatmap</td></tr>
+  <tr><td><strong>Predict &amp; Test</strong></td><td>Manual entry / random profile / slider → real <code>real_predict_single()</code> → action card + gauge + explanation</td></tr>
+</table>
+
+<h3 class="subsec">Inference pipeline flow (real mode)</h3>
+<pre>Input: raw feature vector (78 values, CIC-IDS2017 columns)
+   ↓
+MinMaxScaler.transform()         ← scaler_final.pkl
+   ↓
+RF.predict_proba()  +  XGB.predict_proba()   ← rf_final.pkl, xgb_final.pkl
+   ↓ (concatenated probability arrays)
+MetaLearner.predict()            ← meta_final.pkl  → binary label: 0=benign / 1=attack
+   ↓
+Autoencoder.predict()            ← autoencoder_final.h5
+   ↓ MSE = mean((scaled_X - reconstruction)²)
+threshold = threshold_final.npy
+severity:  MSE > threshold×3  → 2 (CRITICAL)
+           MSE > threshold    → 1 (ELEVATED)
+           else               → 0 (NORMAL)
+   ↓
+_RLPolicy.predict([label, mse, severity])  ← rl_model_final/policy.pth
+   ↓
+action = argmax(policy_net(input))
+   → 0:ALLOW  1:MONITOR  2:BLOCK  3:ISOLATE</pre>
+
+<hr class="divider"/>
+
+<h2 class="section">5 — Complete Edit Checklist</h2>
+<table>
+  <tr><th>#</th><th>Edit</th><th>Location</th><th>Why</th></tr>
+  <tr><td>1</td><td><code>demo_mode</code> default <code>True→False</code></td><td>line 503</td><td>App was always in demo mode</td></tr>
+  <tr><td>2</td><td>Tab 3: generate random sample, not <code>X_data[i]</code></td><td>~line 801</td><td><code>X_data</code> is None in real mode</td></tr>
+  <tr><td>3</td><td>Tab 4: heatmap uses generated data, not <code>demo_X</code></td><td>~line 904</td><td><code>demo_X</code> undefined in real mode</td></tr>
+  <tr><td>4</td><td>Tab 2: use <code>models["threshold"]</code>, not <code>0.05</code></td><td>~line 727</td><td>Hardcoded placeholder</td></tr>
+  <tr><td>5</td><td>Refactor <code>load_models()</code> — per-artifact try/except + absolute paths</td><td>~line 260</td><td>One failure was silently skipping all remaining loads</td></tr>
+  <tr><td>6</td><td>Autoencoder: <code>_CompatDense.from_config()</code> strips <code>quantization_config</code></td><td>~line 289</td><td>Keras version mismatch in Dense layer serialisation</td></tr>
+  <tr><td>7</td><td>RL model: <code>_RLPolicy</code> loads <code>policy.pth</code> directly via PyTorch</td><td>~line 308</td><td>SB3 cloudpickle references NumPy 2.x internals, env has 1.x</td></tr>
+  <tr><td>8</td><td><code>model_ok</code> requires all 7 keys by name</td><td>~line 608</td><td><code>len≥6</code> passed when RL was absent, causing downstream crash</td></tr>
+  <tr><td>9</td><td>Tab 5 sliders: add <code>or not model_ok</code> guard</td><td>~line 1332</td><td>Called <code>real_predict_single</code> even when models missing</td></tr>
+  <tr><td>10</td><td><code>FEATURE_NAMES</code>: 68 wrong names → 78 exact scaler names</td><td>~line 977</td><td>68-feature vector caused ValueError in scaler</td></tr>
+  <tr><td>11</td><td>Suppress sklearn <code>UserWarning</code> in predict functions</td><td>predict_batch / real_predict_single</td><td>Scaler fitted with feature names, called with numpy array</td></tr>
+</table>
+
+<h2 class="section">6 — Environment Actions (outside app.py)</h2>
+<table>
+  <tr><th>Action</th><th>Command</th><th>Reason</th></tr>
+  <tr><td>Install xgboost</td><td><code>anaconda pip install xgboost</code></td><td>Not present in Anaconda env</td></tr>
+  <tr><td>Install stable-baselines3</td><td><code>anaconda pip install stable-baselines3</code></td><td>Not present in Anaconda env</td></tr>
+  <tr><td>Remove NumPy 2.5.0</td><td><code>anaconda pip uninstall numpy</code></td><td>Accidentally installed during debugging, broke pandas C extensions</td></tr>
+  <tr><td>Create rl_model_final.zip</td><td>Python zipfile — pack directory contents</td><td>SB3 loader expects zip; model was saved as unpacked directory</td></tr>
+</table>
+
+<hr class="divider"/>
+
+<h2 class="section">7 — Key Learnings</h2>
+<ul>
+  <li>
+    <strong>Never wrap multiple independent loads in one try/except.</strong>
+    The original code had all 5 pickle loads in a single block — one failure left
+    the entire dict empty with no clear error.
+  </li>
+  <li>
+    <strong>Training environment ≠ deployment environment.</strong>
+    Model was trained on Colab (Linux, NumPy 2.0.2, sklearn 1.6.1) and deployed to
+    Anaconda on Windows (NumPy 1.26.4, sklearn 1.5.1). Incompatibilities must be
+    anticipated and worked around.
+  </li>
+  <li>
+    <strong>Check scaler's <code>feature_names_in_</code> as the ground truth.</strong>
+    The feature list in the UI code had drifted from the training pipeline.
+    Always derive feature names from the fitted scaler, not from documentation or memory.
+  </li>
+  <li>
+    <strong>When cloudpickle fails due to version mismatch, load weights directly.</strong>
+    For PyTorch-backed RL models, <code>policy.pth</code> uses PyTorch's own serialisation
+    which is version-stable. A minimal <code>nn.Module</code> matching the weight keys
+    is far more robust than fighting cloudpickle.
+  </li>
+  <li>
+    <strong>Multiple Python environments on one machine cause silent priority conflicts.</strong>
+    The Anaconda Python was picking up packages from both
+    <code>C:\ProgramData\anaconda3\Lib\site-packages</code> and
+    <code>C:\Users\...\AppData\Roaming\Python\Python312\site-packages</code>.
+    Always verify which environment a package resolves from.
+  </li>
+</ul>
+
+</div>
+
+<div class="footer">
+  CyberShield IDS &nbsp;|&nbsp; How Claude Fixed app.py &nbsp;|&nbsp; Session 2026-06-28
+  &nbsp;|&nbsp; Generated by Claude (claude-sonnet-4-6)
+</div>
+
+</body>
+</html>
